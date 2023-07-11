@@ -1,2 +1,2 @@
 # DistributedLock
-Simple DistributedLock based upon pySyncObj
+Simple distributed lock based upon pySyncObj
