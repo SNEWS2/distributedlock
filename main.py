@@ -32,8 +32,8 @@ def runlock(me: str, peers: List, leader: Value):
     dl.run()
 
 
-if __name__ == '__main__':
-    mp.set_start_method('spawn')
+if __name__ == "__main__":
+    mp.set_start_method("spawn")
     me = False
     peers = []
 
@@ -44,25 +44,24 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         args = json.loads(sys.argv)
 
-        if ('me' or 'hosturi') in args.lower():
-            me = args['me']
-        if 'peerA' in args.lower():
-            peers.append(args['peerA'])
-        if 'peerB' in args.lower():
-            peers.append(args['peerB'])
-        if 'autounlocktime' in args.lower():
-            autoUnlockTime = args['autoUnlockTime']
+        if ("me" or "hosturi") in args.lower():
+            me = args["me"]
+        if "peerA" in args.lower():
+            peers.append(args["peerA"])
+        if "peerB" in args.lower():
+            peers.append(args["peerB"])
+        if "autounlocktime" in args.lower():
+            autoUnlockTime = args["autoUnlockTime"]
     else:
 
-        if 'HOSTURI' in os.environ.keys():
-            me = os.environ['HOSTURI']
-        if 'PEERA_URI' in os.environ.keys():
-            peers.append(os.environ['PEERA_URI'])
-        if 'PEERB_URI' in os.environ.keys():
-            peers.append(os.environ['PEERB_URI'])
-        if 'PEERC_URI' in os.environ.keys():
-            peers.append(os.environ['PEERC_URI'])
-
+        if "HOSTURI" in os.environ.keys():
+            me = os.environ["HOSTURI"]
+        if "PEERA_URI" in os.environ.keys():
+            peers.append(os.environ["PEERA_URI"])
+        if "PEERB_URI" in os.environ.keys():
+            peers.append(os.environ["PEERB_URI"])
+        if "PEERC_URI" in os.environ.keys():
+            peers.append(os.environ["PEERC_URI"])
 
     assert me is not False
     assert len(peers)
@@ -71,7 +70,7 @@ if __name__ == '__main__':
     console.log(f"peers are {peers}")
 
     laststate = None
-    leader = mp.Value('i', 0, lock=True)
+    leader = mp.Value("i", 0, lock=True)
 
     p = mp.Process(target=runlock, args=(me, peers, leader))
     p.start()

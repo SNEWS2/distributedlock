@@ -18,7 +18,7 @@ from multiprocessing import Value
 
 import socket
 
-statedesc = ['follower', 'leader']
+statedesc = ["follower", "leader"]
 
 
 def getmyip() -> str:
@@ -30,10 +30,10 @@ def getmyip() -> str:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.settimeout(0)
         try:
-            s.connect(('10.254.254.254', 1))
+            s.connect(("10.254.254.254", 1))
             myip = s.getsockname()[0]
         except Exception:
-            myip = '127.0.0.1'
+            myip = "127.0.0.1"
 
     return myip
 
@@ -47,7 +47,7 @@ class DistributedLock:
         self.console = Console()
         self.myip = me
         self.port = 8100
-        self.leader = leader    # 1 for leader, 0 for follower
+        self.leader = leader  # 1 for leader, 0 for follower
         self.pysyncobj_version = SyncObj.getCodeVersion()
 
         if self.myip is None:
@@ -68,7 +68,9 @@ class DistributedLock:
 
         while True:
             try:
-                if self.lockmanager.tryAcquire('coincidenceLock', sync=True, timeout=randint(40, 60)):
+                if self.lockmanager.tryAcquire(
+                    "coincidenceLock", sync=True, timeout=randint(40, 60)
+                ):
                     # we have the write lock
                     self.setleaderstate(True)
                     sleep(14)
@@ -80,8 +82,7 @@ class DistributedLock:
                 print(f"Exception! {e}")
             finally:
                 self.setleaderstate(False)
-                self.lockmanager.release('coincidenceLock', sync=True)
-
+                self.lockmanager.release("coincidenceLock", sync=True)
 
     def setleaderstate(self, state: int):
         self.leader.value = state
