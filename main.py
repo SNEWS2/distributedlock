@@ -14,7 +14,7 @@ from typing import List
 from time import sleep
 import multiprocessing as mp
 from multiprocessing import Value
-from Distributed.Lock import DistributedLock, statedesc
+from distributed.lock import DistributedLock, statedesc
 
 from rich.console import Console
 

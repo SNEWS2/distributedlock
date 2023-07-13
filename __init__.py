@@ -1,1 +1,1 @@
-from .Distributed.Lock import DistributedLock
+from .distributed.lock import DistributedLock
