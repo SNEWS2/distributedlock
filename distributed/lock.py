@@ -48,7 +48,7 @@ class DistributedLock:
         self.myip = me
         self.port = 8100
         self.leader = leader  # 1 for leader, 0 for follower
-        self.pysyncobj_version = SyncObj.getCodeVersion()
+#        self.pysyncobj_version = SyncObj.getCodeVersion()
 
         if self.myip is None:
             self.myip = f"{getmyip()}:{self.port}"
