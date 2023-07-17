@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# Created on 5/17/2023
-# @author Mark Linvill
-#
-# PySyncObj distributed lock adapted from pysyncobj examples/docs.
+"""
+ Created on 5/17/2023
+ @author Mark Linvill
+
+ PySyncObj distributed lock adapted from pysyncobj examples/docs.
+"""
 
 from typing import List
 
@@ -20,7 +21,7 @@ from pysyncobj import SyncObj
 from pysyncobj.batteries import ReplLockManager
 
 statedesc = ["follower", "leader"]
-
+STARTPORT = 8100
 
 def getmyip() -> str:
     """
@@ -28,11 +29,11 @@ def getmyip() -> str:
 
     :return: myip: My ip as a string
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.settimeout(0)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(0)
         try:
-            s.connect(("10.254.254.254", 1))
-            myip = s.getsockname()[0]
+            sock.connect(("10.254.254.254", 1))
+            myip = sock.getsockname()[0]
         except Exception:
             myip = "127.0.0.1"
 
@@ -40,22 +41,24 @@ def getmyip() -> str:
 
 
 class DistributedLock:
-    def __init__(self, me: str, peers: List, leader: Value):
+    """
+    Encapsulate distributed lock logic
+
+    """
+    def __init__(self, mynode: str, peerlist: List, leader: Value):
         self.autounlocktime = 35
-        self.peers = peers or []
+        self.peers = peerlist or []
         self.lockmanager = None
         self.syncobj = None
         self.console = Console()
-        self.myip = me
-        self.port = 8100
+        self.myip = mynode
         self.leader = leader  # 1 for leader, 0 for follower
-#        self.pysyncobj_version = SyncObj.getCodeVersion()
 
         if self.myip is None:
-            self.myip = f"{getmyip()}:{self.port}"
+            self.myip = f"{getmyip()}:{STARTPORT}"
 
         assert self.myip is not False
-        assert len(self.peers)
+        assert len(self.peers) != 0
 
     def run(self):
         """
@@ -79,15 +82,24 @@ class DistributedLock:
                     self.setleaderstate(False)
                     sleep(randint(1, 5))
 
-            except Exception as e:
-                print(f"Exception! {e}")
+            except Exception as error:
+                print(f"Exception! {error}")
 
                 self.setleaderstate(False)
                 self.lockmanager.release("coincidenceLock", sync=True)
 
 
     def setleaderstate(self, state: int):
+        """
+        attribute setter
+        :param state:
+        :return: None
+        """
         self.leader.value = state
 
     def getleaderstate(self) -> int:
+        """
+        attribute getter
+        :return: int: leader value
+        """
         return self.leader.value
