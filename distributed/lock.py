@@ -10,13 +10,14 @@ from typing import List
 
 from time import sleep
 from random import randint
+
+import socket
+from multiprocessing import Value
+
 from rich.console import Console
 
 from pysyncobj import SyncObj
 from pysyncobj.batteries import ReplLockManager
-from multiprocessing import Value
-
-import socket
 
 statedesc = ["follower", "leader"]
 
@@ -40,7 +41,7 @@ def getmyip() -> str:
 
 class DistributedLock:
     def __init__(self, me: str, peers: List, leader: Value):
-        self.autounlocktime = 15
+        self.autounlocktime = 35
         self.peers = peers or []
         self.lockmanager = None
         self.syncobj = None
@@ -80,9 +81,10 @@ class DistributedLock:
 
             except Exception as e:
                 print(f"Exception! {e}")
-            finally:
+
                 self.setleaderstate(False)
                 self.lockmanager.release("coincidenceLock", sync=True)
+
 
     def setleaderstate(self, state: int):
         self.leader.value = state
