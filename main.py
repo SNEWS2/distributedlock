@@ -14,7 +14,7 @@ from time import sleep
 import multiprocessing as mp
 from multiprocessing import Value
 from rich.console import Console
-from distributed.lock import DistributedLock, statedesc
+from .distributed.lock import DistributedLock, statedesc
 
 
 def runlock(mynode: str, peerlist: List, leader_state: Value):
@@ -32,7 +32,7 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    me = False
+    myhosturi = False
     peers = []
 
     console = Console()
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         args = json.loads(sys.argv)
 
         if ("me" or "hosturi") in args.lower():
-            me = args["me"]
+            myhosturi = args["me"]
         if "peerA" in args.lower():
             peers.append(args["peerA"])
         if "peerB" in args.lower():
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     else:
 
         if "HOSTURI" in os.environ:
-            me = os.environ["HOSTURI"]
+            myhosturi = os.environ["HOSTURI"]
         if "PEERA_URI" in os.environ:
             peers.append(os.environ["PEERA_URI"])
         if "PEERB_URI" in os.environ:
@@ -61,29 +61,29 @@ if __name__ == "__main__":
         if "PEERC_URI" in os.environ:
             peers.append(os.environ["PEERC_URI"])
 
-    assert me is not False
+    assert myhosturi is not False
     assert len(peers) != 0
 
-    console.log(f"I am {me}")
+    console.log(f"I am {myhosturi}")
     console.log(f"peers are {peers}")
 
     LASTSTATE = None
     leader = mp.Value("i", 0, lock=True)
 
-    p = mp.Process(target=runlock, args=(me, peers, leader))
+    p = mp.Process(target=runlock, args=(myhosturi, peers, leader))
     p.start()
 
     try:
         while True:
             status = leader.value
             if LASTSTATE != status:
-                console.log(f"me: {me}\tstate: {statedesc[status]}")
+                console.log(f"me: {myhosturi}\tstate: {statedesc[status]}")
                 LASTSTATE = status
 
             sleep(2)
 
-    except Exception as e:
-        print(f"Encountered exception! {e}")
+    except Exception as error:
+        print(f"Encountered exception! {error}")
 
     finally:
         p.join()
