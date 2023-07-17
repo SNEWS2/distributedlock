@@ -32,7 +32,7 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    myhosturi = False
+    MYHOSTURI = False
     peers = []
 
     console = Console()
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         args = json.loads(sys.argv)
 
         if ("me" or "hosturi") in args.lower():
-            myhosturi = args["me"]
+            MYHOSTURI = args["me"]
         if "peerA" in args.lower():
             peers.append(args["peerA"])
         if "peerB" in args.lower():
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     else:
 
         if "HOSTURI" in os.environ:
-            myhosturi = os.environ["HOSTURI"]
+            MYHOSTURI = os.environ["HOSTURI"]
         if "PEERA_URI" in os.environ:
             peers.append(os.environ["PEERA_URI"])
         if "PEERB_URI" in os.environ:
@@ -61,23 +61,23 @@ if __name__ == "__main__":
         if "PEERC_URI" in os.environ:
             peers.append(os.environ["PEERC_URI"])
 
-    assert myhosturi is not False
+    assert MYHOSTURI is not False
     assert len(peers) != 0
 
-    console.log(f"I am {myhosturi}")
+    console.log(f"I am {MYHOSTURI}")
     console.log(f"peers are {peers}")
 
     LASTSTATE = None
     leader = mp.Value("i", 0, lock=True)
 
-    p = mp.Process(target=runlock, args=(myhosturi, peers, leader))
+    p = mp.Process(target=runlock, args=(MYHOSTURI, peers, leader))
     p.start()
 
     try:
         while True:
             status = leader.value
             if LASTSTATE != status:
-                console.log(f"me: {myhosturi}\tstate: {statedesc[status]}")
+                console.log(f"me: {MYHOSTURI}\tstate: {statedesc[status]}")
                 LASTSTATE = status
 
             sleep(2)
