@@ -7,14 +7,14 @@ utilizing multiprocessing for process separation/isolation.
 """
 import os
 import sys
-import json
+from dotenv import load_dotenv
 
 from typing import List
 from time import sleep
 import multiprocessing as mp
 from multiprocessing import Value
 from rich.console import Console
-from .distributed.lock import DistributedLock, statedesc
+from distributed.lock import DistributedLock, statedesc
 
 
 def runlock(mynode: str, peerlist: List, leader_state: Value):
@@ -37,29 +37,17 @@ if __name__ == "__main__":
 
     console = Console()
 
-    # Takes a json obj command line argument specifying network (of hosts) config.
-    #
-    if len(sys.argv) > 1:
-        args = json.loads(sys.argv)
+    load_dotenv()
 
-        if ("me" or "hosturi") in args.lower():
-            MYHOSTURI = args["me"]
-        if "peerA" in args.lower():
-            peers.append(args["peerA"])
-        if "peerB" in args.lower():
-            peers.append(args["peerB"])
-        if "autounlocktime" in args.lower():
-            autoUnlockTime = args["autoUnlockTime"]
-    else:
+    if "HOSTURI" in os.environ:
+        MYHOSTURI = os.environ["HOSTURI"]
+    if "PEERA_URI" in os.environ:
+        peers.append(os.environ["PEERA_URI"])
+    if "PEERB_URI" in os.environ:
+        peers.append(os.environ["PEERB_URI"])
+    if "PEERC_URI" in os.environ:
+        peers.append(os.environ["PEERC_URI"])
 
-        if "HOSTURI" in os.environ:
-            MYHOSTURI = os.environ["HOSTURI"]
-        if "PEERA_URI" in os.environ:
-            peers.append(os.environ["PEERA_URI"])
-        if "PEERB_URI" in os.environ:
-            peers.append(os.environ["PEERB_URI"])
-        if "PEERC_URI" in os.environ:
-            peers.append(os.environ["PEERC_URI"])
 
     assert MYHOSTURI is not False
     assert len(peers) != 0
@@ -82,8 +70,8 @@ if __name__ == "__main__":
 
             sleep(2)
 
-    except Exception as error:
-        print(f"Encountered exception! {error}")
+    except Exception as errmsg:
+        print(f"Encountered exception! {errmsg}")
 
     finally:
         p.join()
