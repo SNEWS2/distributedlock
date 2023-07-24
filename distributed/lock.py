@@ -27,7 +27,8 @@ def getmyip() -> str:
     """
     Set up a socket to determine our ip address.
 
-    :return: myip: My ip as a string
+    :return: 'str'
+        My ip as a string
     """
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.settimeout(0)
@@ -82,8 +83,8 @@ class DistributedLock:
                     self.setleaderstate(False)
                     sleep(randint(1, 5))
 
-            except Exception as error:
-                print(f"Exception! {error}")
+            except Exception as errmsg:
+                print(f"Exception! {errmsg}")
 
                 self.setleaderstate(False)
                 self.lockmanager.release("coincidenceLock", sync=True)
