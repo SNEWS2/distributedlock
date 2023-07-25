@@ -25,8 +25,9 @@ HOSTC="${MYIP}:8102"
 HOSTD="${MYIP}:8103"
 
 
-echo "Starting HOSTURI=${HOSTA} PEERA_URI=${HOSTB} PEERB_URI=${HOSTC} PEERC_URI=${HOSTD} ./main.py"
-( HOSTURI="${HOSTA}" PEERA_URI="${HOSTB}" PEERB_URI="${HOSTC}" PEERC_URI="${HOSTD}" ./main.py ) &  hosta_pid=$!
+# This should be the default .env case. Let's test that.
+echo "Starting ./main.py with default .env"
+( ./main.py ) &  hosta_pid=$!
 
 echo "Starting HOSTURI=${HOSTB} PEERA_URI=${HOSTA} PEERB_URI=${HOSTC} PEERC_URI=${HOSTD} ./main.py"
 ( HOSTURI="${HOSTB}" PEERA_URI="${HOSTA}" PEERB_URI="${HOSTC}" PEERC_URI="${HOSTD}" ./main.py ) & hostb_pid=$!

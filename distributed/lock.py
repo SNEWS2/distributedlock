@@ -47,7 +47,7 @@ class DistributedLock:
 
     """
     def __init__(self, mynode: str, peerlist: List, leader: Value):
-        self.autounlocktime = 35
+        self.autounlocktime = 25
         self.peers = peerlist or []
         self.lockmanager = None
         self.syncobj = None
@@ -74,14 +74,14 @@ class DistributedLock:
         while True:
             try:
                 if self.lockmanager.tryAcquire(
-                    "coincidenceLock", sync=True, timeout=randint(40, 60)
+                    "coincidenceLock", sync=True, timeout=randint(30, 60)
                 ):
                     # we have the write lock
                     self.setleaderstate(True)
-                    sleep(14)
+                    sleep(10)
                 else:
                     self.setleaderstate(False)
-                    sleep(randint(1, 5))
+                    sleep(randint(1, 15))
 
             except Exception as errmsg:
                 print(f"Exception! {errmsg}")

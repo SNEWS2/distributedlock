@@ -8,6 +8,7 @@ utilizing multiprocessing for process separation/isolation.
 import os
 import sys
 from dotenv import load_dotenv
+import click
 
 from typing import List
 from time import sleep
@@ -30,14 +31,19 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
     distributedlock.run()
 
 
-if __name__ == "__main__":
+@click.group(invoke_without_command=True)
+@click.option('--env', type=str, default='.env',
+    show_default='.env', help='environment file containing the host/peer configuration')
+@click.pass_context
+def main(ctx, env):
     mp.set_start_method("spawn")
     MYHOSTURI = False
     peers = []
 
     console = Console()
 
-    load_dotenv()
+    envf = env or '.env'
+    load_dotenv(envf)
 
     if "HOSTURI" in os.environ:
         MYHOSTURI = os.environ["HOSTURI"]
@@ -50,7 +56,7 @@ if __name__ == "__main__":
 
 
     assert MYHOSTURI is not False
-    assert len(peers) != 0
+    assert len(peers) > 0
 
     console.log(f"I am {MYHOSTURI}")
     console.log(f"peers are {peers}")
@@ -75,3 +81,7 @@ if __name__ == "__main__":
 
     finally:
         p.join()
+
+
+if __name__ == "__main__":
+    main()
