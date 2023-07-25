@@ -12,7 +12,7 @@ setup(name='distributedlock',
       license='MIT',
       packages=['distributedlock'],
       install_requires=[
-          'dotenv',
+          'python-dotenv',
           'pysyncobj',
           'rich',
       ],
