@@ -77,7 +77,7 @@ def main(ctx, env):
             sleep(2)
 
     except Exception as errmsg:
-        print(f"Encountered exception! {errmsg}")
+        console.print_exception(f"Encountered exception! {errmsg}")
 
     finally:
         p.join()
