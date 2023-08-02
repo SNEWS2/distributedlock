@@ -14,7 +14,7 @@ from multiprocessing import Value
 from dotenv import load_dotenv
 import click
 from rich.console import Console
-from distributed.lock import DistributedLock, statedesc
+from .distributed.lock import DistributedLock, statedesc
 
 
 def runlock(mynode: str, peerlist: List, leader_state: Value):
@@ -76,7 +76,7 @@ def main(ctx=None, env=None):
             sleep(2)
 
     except Exception as errmsg:
-        console.print_exception(f"Encountered exception! {errmsg}")
+        console.print_exception()
 
     finally:
         p.join()
