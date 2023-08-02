@@ -6,14 +6,13 @@ utilizing multiprocessing for process separation/isolation.
 
 """
 import os
-import sys
-from dotenv import load_dotenv
-import click
-
 from typing import List
 from time import sleep
 import multiprocessing as mp
 from multiprocessing import Value
+
+from dotenv import load_dotenv
+import click
 from rich.console import Console
 from distributed.lock import DistributedLock, statedesc
 
@@ -35,7 +34,7 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
 @click.option('--env', type=str, default='.env',
     show_default='.env', help='environment file containing the host/peer configuration')
 @click.pass_context
-def main(ctx, env):
+def main(ctx=None, env=None):
     mp.set_start_method("spawn")
     MYHOSTURI = False
     peers = []
