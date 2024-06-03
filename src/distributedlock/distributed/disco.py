@@ -12,12 +12,13 @@ Created on @date
 """
 
 import sys
+import copy
 import socket
 import json
 import time
 import random
 import threading
-from concurrent.futures import ThreadPoolExecutor, thread
+from concurrent.futures import ThreadPoolExecutor
 import queue
 from hop import Stream
 from hop.io import StartPosition
@@ -37,7 +38,7 @@ class MissingArgumentError(Exception):
     pass
 
 
-class TimeoutError(Exception):
+class DiscoTimeoutError(Exception):
     pass
 
 
@@ -64,7 +65,7 @@ class Id(dict):
                 sock.connect(("10.254.254.254", 1))
                 myip = sock.getsockname()[0]
             except Exception:
-                myip = "127.0.0.1"
+                myip = '127.0.0.1'
 
         self._myip = myip
 
@@ -95,13 +96,16 @@ class PeerList:
     def register_callback(self, callback):
         self._callbacks.append(callback)
 
+    def deregister_callback(self, callback):
+        self._callbacks.remove(callback)
+
     """ PRIVATE
     """
     def get_state(self):
         return self._state
 
     def set_state(self, thing):
-        old_state = self._state
+        old_state = copy.deepcopy(self._state)
 
         if thing in self._state:
             # remove, if the peer is known
@@ -128,7 +132,7 @@ class Disco:
         TODO -
             This needs additional functionality to supervise known peers,
             to become aware of when they go away/drop off the network. Some kind of periodic
-            ping/query/tickle thread.
+            ping/query/tickle thread. Cache?
 
     :return:
     """
@@ -174,10 +178,8 @@ class Disco:
             raise MissingArgumentError
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(self.produce, self._queue, self._event)
+#            executor.submit(self.produce, self._queue, self._event)
             executor.submit(self.consume, self._queue, self._event)
-            thread._threads_queues.clear()           # dirty hack to avoid waiting on long-running
-                                                     # threads to exit
 
         """ Determine my address """
         self._Id = Id()
@@ -250,8 +252,8 @@ class Disco:
         if not self._in_disco:
             self._in_disco = True
             self._send(json.dumps("{'action' : 'DISCO', " +
-                                  " 'source' : '" + f"{json.dumps(self._Id.getmyip())}" +
-                                  "'}"))
+                                  " 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                                  "}"))
 
         time.sleep(random.randint(1, 3))
 
@@ -260,22 +262,23 @@ class Disco:
     def reply(self):
         """ Reply to a discovery request
         """
-        self._send(json.dumps("{'REPLY' : " + f"{json.dumps(self._Id.getmyip())}" +
-                              ", 'source' : '" + f"{json.dumps(self._Id.getmyip())}" +
-                              "'}"))
+        self._send(json.dumps("{'REPLY' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                              ", 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                              "}"))
 
     def end(self):
         self._send(json.dumps("{'action' : 'END', " +
-                              " 'source' : '" + f"{json.dumps(self._Id.getmyip())}" +
-                              "'}"))
+                              " 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                              "}"))
 
     @staticmethod
-    def produce(que, event, msg):
+    def produce(que: queue.Queue, event: threading.Event, msg: str):
         while not event.is_set():
             que.put(msg)
 
-    def consume(self, que, event):
+    def consume(self, que: queue.Queue, event: threading.Event):
         """ Buffers!
+            TODO -
             XXX - This should be profiled to see if buffering is useful or needed here.
             XXX - There is also certainly a better algorithm to drain the queue to some threshold
                   if it's full before putting anything else onto it.
@@ -283,16 +286,16 @@ class Disco:
         if que.full():
             time.sleep(10)
 
-        while not event.is_set() and que.not_empty():
+        while not event.is_set() and not que.empty():
             try:
-                if que.not_full():
+                if not que.full():
                     for msg in self._stream_r:
-                        self._queue.put(msg)
+                        que.put(msg)
 
                 message = que.get()
                 yield message
 
-            except queue.Full:
+            except que.full():
                 time.sleep(10)
                 message = que.get()
                 yield message
@@ -308,7 +311,7 @@ def watchdog_timeout():
     for thrd in threading.enumerate():
         thrd.join(timeout=1)
 
-    # raise(TimeoutError)
+    # raise(DiscoTimeoutError)
     sys.exit(1)
 
 
