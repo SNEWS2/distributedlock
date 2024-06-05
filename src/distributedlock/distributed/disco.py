@@ -31,8 +31,8 @@ write_topic = "snews.testing"
 """ We run discovery until we hear from (at least) this many peers.
 """
 MIN_PEERS = 3
-WATCHDOG_TIMEOUT = 60   # seconds
-
+WATCHDOG_TIMEOUT = 60       # seconds
+DISCO_STARTUP_DELAY = 30    # seconds
 
 class MissingArgumentError(Exception):
     pass
@@ -193,7 +193,7 @@ class Disco:
         if self._stream_uri_w:
             self._stream_w = Stream(until_eos=True, auth=self._auth).open(self._stream_uri_w, 'w')
 
-        time.sleep(2)
+        time.sleep(DISCO_STARTUP_DELAY)
         self.discovery()
 
         return self
