@@ -16,8 +16,11 @@ from multiprocessing import Value
 from pysyncobj import SyncObj
 from pysyncobj.batteries import ReplLockManager
 
-from .logger import getLogger, initialize_logging
+from .logger import getLogger
 log = getLogger("distributed_lock")
+
+__all__ = ['DistributedLock', 'statedesc',
+           'InvalidPeerArgumentError', 'InvalidHostURIError']
 
 statedesc = ["follower", "leader"]
 STARTPORT = 8100
@@ -37,17 +40,16 @@ def getmyip() -> str:
         except Exception:
             myip = "127.0.0.1"
 
-    log.debug(f"getmyip() my ip is {myip}")
+    log.debug("getmyip() my ip is {myip}")
     return myip
 
 class InvalidPeerArgumentError(Exception):
-    pass
+    """ Wrong number of peers error
+    """
 
 class InvalidHostURIError(Exception):
-    pass
-
-class InvalidLockIdError(Exception):
-    pass
+    """ Host URI not provided error
+    """
 
 
 class DistributedLock:
@@ -67,7 +69,8 @@ class DistributedLock:
             lockid = self.genlockid()
 
         self.lockid = lockid
-        self.leader = leader  # multiprocessing Value type, leader.value: 1 for leader, 0 for follower
+        # multiprocessing Value type, leader.value: 1 for leader, 0 for follower
+        self.leader = leader
 
         if self.myip is None:
             self.myip = f"{getmyip()}:{STARTPORT}"
@@ -75,9 +78,11 @@ class DistributedLock:
         if len(self.peers) < 3:
             raise InvalidPeerArgumentError
 
-        log.debug(f"DistributedLock.__init__(): myip {self.myip} peers {self.peers}")
+        log.debug("DistributedLock.__init__(): myip {self.myip} peers {self.peers}")
 
     def genlockid(self) -> str:
+        """ Generate a unique lockid
+        """
         return str(uuid.uuid1().hex)
 
     def run(self):
@@ -95,7 +100,7 @@ class DistributedLock:
                 if self.lockmanager.tryAcquire(
                     self.lockid, sync=True, timeout=randint(30, 60)
                 ):
-                    log.debug(f"{self.myip} I have the lock!")
+                    log.debug("{self.myip} I have the lock!")
                     # we have the write lock
                     self.setleaderstate(True)
                     sleep(10)
@@ -104,20 +109,24 @@ class DistributedLock:
                     sleep(randint(1, 15))
 
             except Exception as errmsg:
-                log.error(f"Exception trying to aquire lock.")
+                log.error(f"Exception trying to aquire lock: {errmsg}")
                 self.stop()
                 raise
 
         self.stop()
 
     def stop(self) -> None:
-        log.warn(f"{self.myip} ...Stopping.")
+        """ Stop the PySyncObj protocol
+        """
+        log.warn("{self.myip} ...Stopping.")
 
         self.setleaderstate(False)
         self.lockmanager.release(self.lockid, sync=True)
 
-    def shutdown(self) -> None:
-        self._run = False
+# Is this needed anymore?
+#
+#    def shutdown(self) -> None:
+#        self._run = False
 
     def setleaderstate(self, state: int) -> None:
         """

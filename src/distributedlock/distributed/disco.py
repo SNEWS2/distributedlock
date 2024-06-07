@@ -23,10 +23,12 @@ import queue
 from hop import Stream
 from hop.io import StartPosition
 
+__all__ = ['Disco', 'PeerList',
+           'DiscoTimeoutError', 'MissingArgumentError', 'UnknownActionError']
 
-broker = "kafka.scimma.org"
-read_topic = "snews.testing"
-write_topic = "snews.testing"
+BROKER = "kafka.scimma.org"
+READ_TOPIC = "snews.testing"
+WRITE_TOPIC = "snews.testing"
 
 """ We run discovery until we hear from (at least) this many peers.
 """
@@ -35,16 +37,16 @@ WATCHDOG_TIMEOUT = 60       # seconds
 DISCO_STARTUP_DELAY = 30    # seconds
 
 class MissingArgumentError(Exception):
-    pass
-
+    """ Missing Arguments Error
+    """
 
 class DiscoTimeoutError(Exception):
-    pass
-
+    """ Discovery protocol timeout error
+    """
 
 class UnknownActionError(Exception):
-    pass
-
+    """ Discovery protocol violation
+    """
 
 class Id(dict):
     """
@@ -70,6 +72,8 @@ class Id(dict):
         self._myip = myip
 
     def getmyip(self):
+        """ Return my ip address
+        """
         return self._myip
 
 
@@ -88,23 +92,35 @@ class PeerList:
     """ PUBLIC
     """
     def add_peer(self, peer):
+        """ Add a peer by name to the list of known peers
+        """
         self.set_state(peer)
 
     def remove_peer(self, peer):
+        """ Remove a peer by name from the list of known peers
+        """
         self.set_state(peer)
 
     def register_callback(self, callback):
+        """ Register a function to call on peer state changes
+        """
         self._callbacks.append(callback)
 
     def deregister_callback(self, callback):
+        """ De-register a function previously registered to be called on peer state changes
+        """
         self._callbacks.remove(callback)
 
     """ PRIVATE
     """
     def get_state(self):
+        """ Return the state
+        """
         return self._state
 
     def set_state(self, thing):
+        """ Change the state
+        """
         old_state = copy.deepcopy(self._state)
 
         if thing in self._state:
@@ -118,10 +134,14 @@ class PeerList:
         self._notify(old_state, self.get_state())
 
     def _notify(self, old_state, new_state):
+        """ Call the functions that registered an interest in state changes
+        """
         for callback in self._callbacks:
             callback(old_state, new_state)
 
     def __len__(self):
+        """ Dunder method to return the number of known peers
+        """
         return self._length
 
 
@@ -149,7 +169,7 @@ class Disco:
         self._stream_w = None
         self._in_disco = False
         self._peerlist = PeerList()
-        self._Id = None
+        self._id = None
         self._queue = None
         self._event = None
 
@@ -182,7 +202,7 @@ class Disco:
             executor.submit(self.consume, self._queue, self._event)
 
         """ Determine my address """
-        self._Id = Id()
+        self._id = Id()
 
     def __enter__(self):
         if self._stream_uri_r:
@@ -198,7 +218,7 @@ class Disco:
 
         return self
 
-    def __exit__(self):
+    def __exit__(self, *_):
         self._stream_r.close()
         self._stream_w.close()
         self._event.set()
@@ -208,8 +228,8 @@ class Disco:
         """
         if len(msg) > 1 and self._stream_w:
             return self._stream_w.write(msg)
-        else:
-            return False
+
+        return False
 
     def _recv(self):
         """ Encapsulate the logic/method of actually reading
@@ -217,7 +237,11 @@ class Disco:
         if self._stream_r:
             return self._stream_r
 
+        return False
+
     def poll(self):
+        """ Main logic for the protocol, wait for messages, register peers, end when we have enough
+        """
         endit = False
         time.sleep(2)
 
@@ -225,7 +249,7 @@ class Disco:
             for message in self.consume(self._queue, self._event):
                 msg = json.loads(message.content)
 
-                if self._Id.getmyip() == msg['source']:
+                if self._id.getmyip() == msg['source']:
                     print("skipping message from myself")
                     continue
 
@@ -247,12 +271,12 @@ class Disco:
             time.sleep(2 + random.randint(0, 4))
 
     def discovery(self):
-        """ Ask who is out there
+        """ Launch the discovery protocol. Find peers.
         """
         if not self._in_disco:
             self._in_disco = True
             self._send(json.dumps("{'action' : 'DISCO', " +
-                                  " 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                                  " 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
                                   "}"))
 
         time.sleep(random.randint(1, 3))
@@ -262,17 +286,21 @@ class Disco:
     def reply(self):
         """ Reply to a discovery request
         """
-        self._send(json.dumps("{'REPLY' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
-                              ", 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+        self._send(json.dumps("{'REPLY' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
+                              ", 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
                               "}"))
 
     def end(self):
+        """ Send the 'end' discovery protocol action
+        """
         self._send(json.dumps("{'action' : 'END', " +
-                              " 'source' : " + json.dumps(self._Id.getmyip()).encode("utf-8") +
+                              " 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
                               "}"))
 
     @staticmethod
     def produce(que: queue.Queue, event: threading.Event, msg: str):
+        """ Put msg in the work queue
+        """
         while not event.is_set():
             que.put(msg)
 
@@ -301,10 +329,14 @@ class Disco:
                 yield message
 
     def get_peerlist(self):
+        """ Return the list of peers
+        """
         return self._peerlist
 
 
 def watchdog_timeout():
+    """ Watchdog timer implementation for the discovery protocol
+    """
     print("Watchdog time-out!")
     """ This hangs in the socket read, doesn't actually exit/end.
     """
@@ -321,7 +353,7 @@ if __name__ == "__main__":
     watchdog.daemon = True
     watchdog.start()
 
-    with Disco(broker=broker, read_topic=read_topic, write_topic=write_topic) as disco:
+    with Disco(broker=BROKER, read_topic=READ_TOPIC, write_topic=WRITE_TOPIC) as disco:
         print(f"Peers: {disco.get_peerlist()}")
 
     watchdog.cancel()

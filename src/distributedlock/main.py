@@ -14,7 +14,8 @@ from multiprocessing import Value
 from dotenv import load_dotenv
 import click
 from rich.console import Console
-from .distributed.lock import DistributedLock, statedesc, InvalidPeerArgumentError, InvalidHostURIError
+from .distributed.lock import (DistributedLock, statedesc,
+                               InvalidPeerArgumentError, InvalidHostURIError)
 from .distributed.disco import Disco
 
 def runlock(mynode: str, peerlist: List, leader_state: Value):
@@ -36,21 +37,23 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
 @click.pass_context
 def main(ctx=None, env=None):
     mp.set_start_method("spawn")
-    MYHOSTURI = False
+    myhosturi = False
     peers = []
 
     console = Console()
 
+    ctx.ensure_object(dict)
     envf = env or '.env'
     load_dotenv(envf)
+    ctx.obj['env'] = env
 
-    MYHOSTURI = os.getenv("HOSTURI")
+    myhosturi = os.getenv("HOSTURI")
 
     peers.append(os.getenv("PEERA_URI"))
     peers.append(os.getenv("PEERB_URI"))
     peers.append(os.getenv("PEERC_URI"))
 
-    if not MYHOSTURI:
+    if not myhosturi:
         raise InvalidHostURIError
 
     """ Connect to kafka, discover other distributed lock servers.
@@ -64,31 +67,31 @@ def main(ctx=None, env=None):
     """
     with Disco(broker=os.getenv("BROKER"), read_topic=os.getenv("DISCO_READ_TOPIC"),
                write_topic=os.getenv("DISCO_WRITE_TOPIC")) as disco:
-        print(f"discovery state: {disco.get_state()}")
-        peers.append(disco.get_state())
+        print(f"discovery state: {disco.get_peerlist()}")
+        peers.append(disco.get_peerlist())
 
     if len(peers) < 3 or None in peers:
         raise InvalidPeerArgumentError
 
-    console.log(f"I am {MYHOSTURI}")
+    console.log(f"I am {myhosturi}")
     console.log(f"peers are {peers}")
 
-    LASTSTATE = None
+    laststate = None
     leader = mp.Value("i", 0, lock=True)
 
-    p = mp.Process(target=runlock, args=(MYHOSTURI, peers, leader))
+    p = mp.Process(target=runlock, args=(myhosturi, peers, leader))
     p.start()
 
     try:
         while True:
             status = leader.value
-            if LASTSTATE != status:
-                console.log(f"me: {MYHOSTURI}\tstate: {statedesc[status]}")
-                LASTSTATE = status
+            if laststate != status:
+                console.log(f"me: {myhosturi}\tstate: {statedesc[status]}")
+                laststate = status
 
             sleep(2)
 
-    except Exception as errmsg:
+    except Exception:
         console.print_exception()
 
     finally:
