@@ -109,7 +109,7 @@ class DistributedLock:
                     sleep(randint(1, 15))
 
             except Exception as errmsg:
-                log.error(f"Exception trying to aquire lock: {errmsg}")
+                log.error("Exception trying to aquire lock: {errmsg}")
                 self.stop()
                 raise
 
