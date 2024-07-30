@@ -11,42 +11,57 @@ Created on @date
 @author: mlinvill
 """
 
-import sys
+# import sys
 import copy
 import socket
 import json
 import time
 import random
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import queue
 from hop import Stream
-from hop.io import StartPosition
+# from hop.io import StartPosition
+from .logger import getLogger
 
 __all__ = ['Disco', 'PeerList',
+           'BROKER', 'READ_TOPIC', 'WRITE_TOPIC',
            'DiscoTimeoutError', 'MissingArgumentError', 'UnknownActionError']
 
 BROKER = "kafka.scimma.org"
-READ_TOPIC = "snews.testing"
-WRITE_TOPIC = "snews.testing"
+READ_TOPIC = "snews.operations"
+WRITE_TOPIC = "snews.operations"
 
 """ We run discovery until we hear from (at least) this many peers.
 """
-MIN_PEERS = 3
-WATCHDOG_TIMEOUT = 60       # seconds
-DISCO_STARTUP_DELAY = 30    # seconds
+MIN_PEERS = 2
+WATCHDOG_TIMEOUT = 60  # seconds
+DISCO_STARTUP_DELAY = 30  # seconds
+
+log = getLogger("distributed_lock")
+log.setLevel(logging.DEBUG)
+
+
+class NetworkError(Exception):
+    """ Catch-all for network problems
+    """
+
 
 class MissingArgumentError(Exception):
     """ Missing Arguments Error
     """
 
+
 class DiscoTimeoutError(Exception):
     """ Discovery protocol timeout error
     """
 
+
 class UnknownActionError(Exception):
     """ Discovery protocol violation
     """
+
 
 class Id(dict):
     """
@@ -54,6 +69,7 @@ class Id(dict):
 
     Need to handle ports also.
     """
+
     def __init__(self):
         dict.__init__(self)
         self._myip: str
@@ -64,9 +80,13 @@ class Id(dict):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(0)
             try:
+                """ This can throw OSError or TimeoutError, but we don't care. Any
+                    exception results in not being able to determine our ip and fall-back 
+                    to a default value.
+                """
                 sock.connect(("10.254.254.254", 1))
                 myip = sock.getsockname()[0]
-            except Exception:
+            except:
                 myip = '127.0.0.1'
 
         self._myip = myip
@@ -84,13 +104,13 @@ class PeerList:
     @property doesn't play nice with set(), so we use getters/setters.
 
     """
+
     def __init__(self):
         self._length = 0
         self._state = set()
         self._callbacks = []
 
-    """ PUBLIC
-    """
+    # PUBLIC
     def add_peer(self, peer):
         """ Add a peer by name to the list of known peers
         """
@@ -111,8 +131,7 @@ class PeerList:
         """
         self._callbacks.remove(callback)
 
-    """ PRIVATE
-    """
+    # PRIVATE
     def get_state(self):
         """ Return the state
         """
@@ -140,9 +159,12 @@ class PeerList:
             callback(old_state, new_state)
 
     def __len__(self):
-        """ Dunder method to return the number of known peers
+        """ Return the number of known peers
         """
         return self._length
+
+    def __repr__(self):
+        return self._state
 
 
 class Disco:
@@ -156,6 +178,7 @@ class Disco:
 
     :return:
     """
+
     def __init__(self, *args, **kwargs):
         self._me = None
         self._auth = True
@@ -170,8 +193,10 @@ class Disco:
         self._in_disco = False
         self._peerlist = PeerList()
         self._id = None
-        self._queue = None
+        self._in_queue = None
+        self._out_queue = None
         self._event = None
+        self._endit = False
 
         """ setup broker, topic attributes
         """
@@ -179,7 +204,8 @@ class Disco:
             key = f"_{k}"
             self.__dict__[key] = v
 
-        self._queue = queue.Queue(maxsize=15)
+        self._in_queue = queue.Queue(maxsize=15)
+        self._out_queue = queue.Queue(maxsize=15)
         self._event = threading.Event()
 
         if self._broker:
@@ -197,136 +223,132 @@ class Disco:
         else:
             raise MissingArgumentError
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-#            executor.submit(self.produce, self._queue, self._event)
-            executor.submit(self.consume, self._queue, self._event)
-
-        """ Determine my address """
+        # Determine my address
         self._id = Id()
+        if self._id is None:
+            raise NetworkError
+
 
     def __enter__(self):
         if self._stream_uri_r:
             self._stream_r = Stream(until_eos=True,
-                                    auth=self._auth,
-                                    start_at=StartPosition.EARLIEST).open(self._stream_uri_r, 'r')
+                                    auth=self._auth).open(self._stream_uri_r, 'r')
 
         if self._stream_uri_w:
             self._stream_w = Stream(until_eos=True, auth=self._auth).open(self._stream_uri_w, 'w')
 
         time.sleep(DISCO_STARTUP_DELAY)
-        self.discovery()
+
+        executor = ThreadPoolExecutor(max_workers=2)
+        recv_thrd = executor.submit(self._recv, self, log)
+        send_thrd = executor.submit(self._send, self, log)
+
+        while not self._event.is_set():
+            self.discovery()
+
+        done, not_done = wait([recv_thrd, send_thrd], return_when=concurrent.futures.ALL_COMPLETED)
+        executor.shutdown()
 
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, exception_type, exception_value, traceback):
         self._stream_r.close()
         self._stream_w.close()
         self._event.set()
 
-    def _send(self, msg):
+    @staticmethod
+    def _send(self, log):
         """ Encapsulate the logic/method of actually writing
         """
-        if len(msg) > 1 and self._stream_w:
-            return self._stream_w.write(msg)
+        #        log.debug("in _send()")
+        while not self._event.is_set():
+            #            log.debug("_send(): _event not set")
 
-        return False
+            for msg in [self._out_queue.get()]:
+                log.debug(f"_send(): calling stream.write({msg})")
+                self._stream_w.write(msg)
 
-    def _recv(self):
+    @staticmethod
+    def _recv(self, log):
         """ Encapsulate the logic/method of actually reading
         """
-        if self._stream_r:
-            return self._stream_r
-
-        return False
-
-    def poll(self):
-        """ Main logic for the protocol, wait for messages, register peers, end when we have enough
-        """
-        endit = False
-        time.sleep(2)
-
-        while not endit:
-            for message in self.consume(self._queue, self._event):
-                msg = json.loads(message.content)
-
-                if self._id.getmyip() == msg['source']:
-                    print("skipping message from myself")
-                    continue
-
-                if 'DISCO' in msg['action']:
-                    self._in_disco = True
-                    self.reply()
-                elif 'REPLY' in msg['action']:
-                    self._peerlist.add_peer(msg['REPLY'])
-                    if len(self._peerlist) >= MIN_PEERS:
-                        self.end()
-                elif 'END' in msg['action']:
-                    endit = True
-                else:
-                    raise UnknownActionError
-
-            if endit:
-                break
-
-            time.sleep(2 + random.randint(0, 4))
+        #        log.debug("in _recv()")
+        while not self._event.is_set():
+            for message in self._stream_r:
+                self._in_queue.put(message)
 
     def discovery(self):
         """ Launch the discovery protocol. Find peers.
         """
         if not self._in_disco:
             self._in_disco = True
-            self._send(json.dumps("{'action' : 'DISCO', " +
-                                  " 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
-                                  "}"))
+            discorply = {"action": "DISCO", "source": self._id.getmyip()}
+            self.produce(json.dumps(discorply))
 
-        time.sleep(random.randint(1, 3))
-
+        time.sleep(random.randint(2, 4))
         self.poll()
+
+    def poll(self):
+        """ Main logic for the protocol, wait for messages, register peers, end when we have enough
+        """
+        while not self._endit:
+            time.sleep(2 + random.randint(0, 2))
+
+            for message in self.consume():
+                msg = json.loads(message.content)
+                log.debug(f"in poll(): msg is {msg}}")
+
+                if self._id.getmyip() == msg['source']:
+                    log.debug("skipping message from myself")
+                    continue
+
+                if 'DISCO' in msg['action']:
+                    self._in_disco = True
+                    log.debug("I see DISCO. Calling reply()")
+                    self.reply()
+                elif 'REPLY' in msg['action']:
+                    self._peerlist.add_peer(msg['reply'])
+                    if len(self._peerlist) >= MIN_PEERS:
+                        self.end()
+                elif 'END' in msg['action']:
+                    self.stop()
+                else:
+                    raise UnknownActionError
+
+            if self._endit:
+                break
 
     def reply(self):
         """ Reply to a discovery request
         """
-        self._send(json.dumps("{'REPLY' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
-                              ", 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
-                              "}"))
+        log.debug("reply(): sending reply")
+        rply = {"action": "REPLY",
+                "reply": self._id.getmyip(),
+                "source": self._id.getmyip()}
+        self.produce(json.dumps(rply))
 
     def end(self):
         """ Send the 'end' discovery protocol action
         """
-        self._send(json.dumps("{'action' : 'END', " +
-                              " 'source' : " + json.dumps(self._id.getmyip()).encode("utf-8") +
-                              "}"))
+        endrply = {"action": "END", "source": self._id.getmyip()}
+        self.produce(json.dumps(endrply))
 
-    @staticmethod
-    def produce(que: queue.Queue, event: threading.Event, msg: str):
+    def produce(self, msg: str):
         """ Put msg in the work queue
         """
-        while not event.is_set():
-            que.put(msg)
+        if not self._event.is_set() and not self._out_queue.full():
+            log.debug(f"produce(): queueing [{msg}] for kafka")
+            self._out_queue.put(str(msg))
 
-    def consume(self, que: queue.Queue, event: threading.Event):
-        """ Buffers!
-            TODO -
-            XXX - This should be profiled to see if buffering is useful or needed here.
-            XXX - There is also certainly a better algorithm to drain the queue to some threshold
-                  if it's full before putting anything else onto it.
-        """
-        if que.full():
-            time.sleep(10)
+    def consume(self):
+        while not self._in_queue.empty():
+            message = self._in_queue.get()
+            log.debug(f"consume(): incoming message {message} from kafka")
+            yield message
 
-        while not event.is_set() and not que.empty():
-            try:
-                if not que.full():
-                    for msg in self._stream_r:
-                        que.put(msg)
-
-                message = que.get()
-                yield message
-
-            except que.full():
-                time.sleep(10)
-                message = que.get()
-                yield message
+    def stop(self):
+        self._endit = True
+        self._event.set()
 
     def get_peerlist(self):
         """ Return the list of peers
@@ -337,23 +359,16 @@ class Disco:
 def watchdog_timeout():
     """ Watchdog timer implementation for the discovery protocol
     """
-    print("Watchdog time-out!")
-    """ This hangs in the socket read, doesn't actually exit/end.
-    """
-    for thrd in threading.enumerate():
-        thrd.join(timeout=1)
-
-    # raise(DiscoTimeoutError)
-    sys.exit(1)
+    log.error("Watchdog time-out!")
+    raise(DiscoTimeoutError)
 
 
 if __name__ == "__main__":
-
     watchdog = threading.Timer(WATCHDOG_TIMEOUT, watchdog_timeout)
     watchdog.daemon = True
     watchdog.start()
 
     with Disco(broker=BROKER, read_topic=READ_TOPIC, write_topic=WRITE_TOPIC) as disco:
-        print(f"Peers: {disco.get_peerlist()}")
+        log.debug(f"Peers: {disco.get_peerlist()}")
 
     watchdog.cancel()
