@@ -29,7 +29,7 @@ HOST = gethostname()
 
 snewslog = os.getenv('SNEWSLOG')
 if snewslog:
-    log_file = Path(snewslog) / "distributed_lock.log"
+    log_file = Path(snewslog) / f"{HOST}.distributed_lock.log"
 else:
     log_file = "distributed_lock.log"
 
