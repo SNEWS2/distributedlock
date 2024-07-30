@@ -98,8 +98,8 @@ class TestDisco:
     @classmethod
     def setup_class(cls):
         cls.broker = "kafka.scimma.org"
-        cls.read_topic = "snews.testing"
-        cls.write_topic = "snews.testing"
+        cls.read_topic = "snews.operations"
+        cls.write_topic = "snews.operations"
 
         cls.watchdog = threading.Timer(WATCHDOG_TIMEOUT, watchdog_timeout)
         cls.watchdog.daemon = True
@@ -164,8 +164,8 @@ def watchdog_timeout():
     print("Watchdog time-out!")
     """ This hangs in the socket read, doesn't actually exit/end.
     """
-    for thread in threading.enumerate():
-        thread.join(timeout=1)
+#    for thread in threading.enumerate():
+#        thread.join(timeout=1)
 
     # raise(TimeoutError)
     sys.exit(1)
