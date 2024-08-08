@@ -16,7 +16,8 @@ import click
 from rich.console import Console
 from distributed.lock import (DistributedLock, statedesc,
                                InvalidPeerArgumentError, InvalidHostURIError)
-from distributed.disco import Disco
+#from distributed.disco import Disco
+from distributed.disco import Disco, BROKER, READ_TOPIC, WRITE_TOPIC, DiscoTimeoutError
 
 def runlock(mynode: str, peerlist: List, leader_state: Value):
     """
@@ -47,16 +48,9 @@ def main(ctx=None, env=None):
     load_dotenv(envf)
     ctx.obj['env'] = env
 
-    myhosturi = os.getenv("HOSTURI")
 
-    peers.append(os.getenv("PEERA_URI"))
-    peers.append(os.getenv("PEERB_URI"))
-    peers.append(os.getenv("PEERC_URI"))
-
-    if not myhosturi:
-        raise InvalidHostURIError
-
-    # Connect to kafka and discover other distributed lock servers.
+    # Discover other distributed lock servers via Kafka.
+    #
     #    XXX - TODO -
     #    This is the only dependency on Kafka. Can this be abstracted out? Or should this library
     #    be more tightly integrated with SNEWS Coincidence server code?
@@ -65,10 +59,13 @@ def main(ctx=None, env=None):
     #    more flexible. Peers may come and go. We need to be able to drop back into discovery mode
     #    as peers come and go, perhaps even asynchronously.
 
-    with Disco(broker=os.getenv("BROKER"), read_topic=os.getenv("DISCO_READ_TOPIC"),
-               write_topic=os.getenv("DISCO_WRITE_TOPIC")) as disco:
+    with Disco(broker=BROKER, read_topic=READ_TOPIC, write_topic=WRITE_TOPIC) as disco:
+        myhosturi = disco.whoami()
         print(f"discovery state: {disco.get_peerlist()}")
         peers.append(disco.get_peerlist())
+
+    if not myhosturi:
+        raise InvalidHostURIError
 
     if len(peers) < 3 or None in peers:
         raise InvalidPeerArgumentError
