@@ -123,10 +123,6 @@ class DistributedLock:
         self.setleaderstate(False)
         self.lockmanager.release(self.lockid, sync=True)
 
-# Is this needed anymore?
-#
-#    def shutdown(self) -> None:
-#        self._run = False
 
     def setleaderstate(self, state: int) -> None:
         """
