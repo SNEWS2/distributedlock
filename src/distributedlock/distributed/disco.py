@@ -13,7 +13,6 @@ Created on @date
 
 # import sys
 import copy
-import socket
 import json
 import time
 import random
@@ -127,23 +126,6 @@ class PeerList:
     def get_state(self):
         """Return the state"""
         return self._state
-
-    # Unnecessarily complicated
-    #
-    #    def set_state(self, thing):
-    #        """ Change the state
-    #        """
-    #        old_state = copy.deepcopy(self._state)
-    #
-    #        if thing in self._state:
-    #            # remove, if the peer is known
-    #            self._state.discard(thing)
-    #        else:
-    #            # add
-    #            self._state.add(thing)
-    #
-    #        self._length = len(self._state)
-    #        self._notify(old_state, self.get_state())
 
     def _notify(self, old_state, new_state):
         """Call the functions that registered an interest in state changes"""
