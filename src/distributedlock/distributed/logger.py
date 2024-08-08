@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on @date 
+Created on @date
 
 from https://python-tutorial.dev/201/tutorial/logging.html
 
@@ -29,11 +29,11 @@ HOST = gethostname()
 
 snewslog = os.getenv('SNEWSLOG')
 if snewslog:
-    log_file = Path(snewslog) / f"{HOST}.distributed_lock.log"
+    LOG_FILE = Path(snewslog) / f"{HOST}.distributed_lock.log"
 else:
-    log_file = "distributed_lock.log"
+    LOG_FILE = "distributed_lock.log"
 
-fh = FileHandler(log_file)
+fh = FileHandler(LOG_FILE)
 
 formatter = Formatter(f'%(asctime)s {HOST} %(levelname)s [%(name)s] %(message)s',
                       datefmt='%Y-%m-%d %H:%M:%S')

@@ -51,6 +51,10 @@ class InvalidHostURIError(Exception):
     """ Host URI not provided error
     """
 
+def genlockid() -> str:
+    """ Generate a unique lockid
+    """
+    return str(uuid.uuid1().hex)
 
 class DistributedLock:
     """
@@ -66,7 +70,7 @@ class DistributedLock:
 
         if not lockid or lockid is None:
             print("Warning! You should provide a lockid! Hint: try genlockid()")
-            lockid = self.genlockid()
+            lockid = genlockid()
 
         self.lockid = lockid
         # multiprocessing Value type, leader.value: 1 for leader, 0 for follower
@@ -80,10 +84,7 @@ class DistributedLock:
 
         log.debug("DistributedLock.__init__(): myip {self.myip} peers {self.peers}")
 
-    def genlockid(self) -> str:
-        """ Generate a unique lockid
-        """
-        return str(uuid.uuid1().hex)
+
 
     def run(self):
         """
@@ -118,7 +119,7 @@ class DistributedLock:
     def stop(self) -> None:
         """ Stop the PySyncObj protocol
         """
-        log.warn("{self.myip} ...Stopping.")
+        log.info("{self.myip} ...Stopping.")
 
         self.setleaderstate(False)
         self.lockmanager.release(self.lockid, sync=True)

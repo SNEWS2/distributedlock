@@ -6,7 +6,7 @@ disco.py - Remote peer discovery over kafka topic via hop-client.
 
 This should generate events on peer changes!!!
 
-Created on @date 
+Created on @date
 
 @author: mlinvill
 """
@@ -84,7 +84,8 @@ class Id(dict):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(0)
             try:
-                """This can throw OSError or TimeoutError, but we don't care. Any
+                """
+                This can throw OSError or TimeoutError, but we don't care. Any
                 exception results in not being able to determine our ip and fall-back
                 to a default value.
                 """
@@ -118,7 +119,7 @@ class PeerList:
         old_state = copy.deepcopy(self._state)
 
         log.debug(
-            f"PeerList: add_peer(): Adding {peer}, state before is {pprint.pformat(self._state)}"
+            "PeerList: add_peer(): Adding {peer}, state before is {pprint.pformat(self._state)}"
         )
         self._state.add(peer)
         self._length = len(self._state)
@@ -199,6 +200,7 @@ class Disco:
         self._in_disco = False
         self._peerlist = PeerList()
         self._id = None
+        self._executor = None
         self._thrds = dict()
         self._in_queue = queue.Queue(maxsize=15)
         self._out_queue = queue.Queue(maxsize=15)
@@ -207,9 +209,9 @@ class Disco:
 
         """ setup broker, topic attributes
         """
-        for k, v in kwargs.items():
+        for k, val in kwargs.items():
             key = f"_{k}"
-            self.__dict__[key] = v
+            self.__dict__[key] = val
 
         if self._broker:
             if self._read_topic:
@@ -245,8 +247,8 @@ class Disco:
         time.sleep(DISCO_STARTUP_DELAY)
 
         self._executor = ThreadPoolExecutor(max_workers=2)
-        self._thrds["recv"] = self._executor.submit(self._recv, self, log)
-        self._thrds["send"] = self._executor.submit(self._send, self, log)
+        self._thrds["recv"] = self._executor.submit(self._recv, self)
+        self._thrds["send"] = self._executor.submit(self._send, self)
 
         while not self._event.is_set():
             self.discovery()
@@ -261,15 +263,14 @@ class Disco:
         self._event.set()
 
     @staticmethod
-    def _send(self, logh):
+    def _send(self):
         """Encapsulate the logic/method of actually writing"""
         while not self._event.is_set():
             for msg in [self._out_queue.get()]:
-                logh.debug(f"_send(): calling stream.write({msg})")
                 self._stream_w.write(msg)
 
     @staticmethod
-    def _recv(self, logh):
+    def _recv(self):
         """Encapsulate the logic/method of actually reading"""
         while not self._event.is_set():
             for message in self._stream_r:
@@ -285,7 +286,9 @@ class Disco:
         self.poll()
 
     def poll(self):
-        """Main logic for the protocol, wait for messages, register peers, end when we have enough"""
+        """Main logic for the protocol, wait for messages,
+           register peers, end when we have enough
+        """
         while not self._endit:
             time.sleep(1 + random.randint(0, 3))
 
@@ -327,16 +330,18 @@ class Disco:
     def produce(self, msg: str):
         """Put msg in the work queue"""
         if not self._event.is_set() and not self._out_queue.full():
-            log.debug(f"produce(): queueing [{msg}] for kafka")
+            log.debug("produce(): queueing [{msg}] for kafka")
             self._out_queue.put(str(msg))
 
     def consume(self):
+        """Get messages from the work queue"""
         while not self._in_queue.empty():
             message = self._in_queue.get()
-            log.debug(f"consume(): incoming message {message} from kafka")
+            log.debug("consume(): incoming message {message} from kafka")
             yield message
 
     def shutdown(self):
+        """Stop disco"""
         self._endit = True
         self._event.set()
 
@@ -361,6 +366,6 @@ if __name__ == "__main__":
     watchdog.start()
 
     with Disco(broker=BROKER, read_topic=READ_TOPIC, write_topic=WRITE_TOPIC) as disco:
-        log.debug(f"Peers: {disco.get_peerlist()}")
+        log.debug("Peers: {disco.get_peerlist()}")
 
     watchdog.cancel()
