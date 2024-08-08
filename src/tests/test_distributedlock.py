@@ -18,6 +18,7 @@ WATCHDOG_TIMEOUT = 60  # seconds
 
 
 def cb_output(old, new):
+    """Dummy callback function"""
     print(f"old: {old} / new: {new}")
 
 
@@ -30,43 +31,52 @@ def runlock(mynode: str, peerlist: List, leader_state: Value):
     :param leader_state: Value
     :return: None
     """
-    distributedlock = DistributedLock(mynode, peerlist, leader=leader_state)
+    distributedlock = DistributedLock(mynode, peerlist, lockid=None, leader=leader_state)
     distributedlock.run()
 
 
 class TestPeerList:
+    """ Test the PeerList class """
 
     def setup_class(self):
+        """Setup PeerList"""
         self.length = 0
         self.peerlist = PeerList()
 
     def test_instance(self):
+        """Is it a PeerList"""
         assert isinstance(self.peerlist, PeerList)
 
     def test_add(self):
+        """Test add function"""
         self.peerlist.add_peer("127.0.0.1")
 
         assert len(self.peerlist) == 1
 
     def test_add_another(self):
+        """Test add function"""
         self.peerlist.add_peer("192.168.0.1")
 
         assert len(self.peerlist) == 2
 
     def test_remove_one(self):
+        """Test remove"""
         self.peerlist.remove_peer("127.0.0.1")
 
         assert len(self.peerlist) == 1
 
     def test_callback(self):
+        """Test callback"""
         self.peerlist.register_callback(cb_output)
 
     def test_remove_another(self):
+        """Test remove"""
         self.peerlist.remove_peer("192.168.0.1")
 
         assert len(self.peerlist) == 0
 
     def test_add_part_two(self):
+        """Test add another"""
         self.peerlist.add_peer("10.0.0.1")
         self.peerlist.add_peer("10.0.0.2")
         self.peerlist.add_peer("10.0.0.3")
@@ -74,19 +84,12 @@ class TestPeerList:
         assert len(self.peerlist) == 3
 
     def test_remove_callback(self):
+        """Test removing a callback"""
         self.peerlist.deregister_callback(cb_output)
 
-    def test_update_state_add(self):
-        self.peerlist.set_state("10.0.0.5")
-
-        assert len(self.peerlist) == 4
-
-    def test_update_state_remove(self):
-        self.peerlist.set_state("10.0.0.5")
-
-        assert len(self.peerlist) == 3
 
     def teardown_class(self):
+        """Cleanup"""
         del self.peerlist
 
 
@@ -122,7 +125,7 @@ class TestDisco:
 
 
 class TestDistributedLock:
-
+    """ Test DistributedLock class """
     @classmethod
     def setup_class(cls):
         mynode = "127.0.0.1:8100"

@@ -23,6 +23,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import queue
 from hop import Stream
+from .lock import getmyip
 from .logger import getLogger
 
 __all__ = [
@@ -76,25 +77,7 @@ class Id(dict):
 
     def __init__(self):
         dict.__init__(self)
-        self._myip: str
-
-        """
-        Set up a socket to determine our ip address.
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.settimeout(0)
-            try:
-                """
-                This can throw OSError or TimeoutError, but we don't care. Any
-                exception results in not being able to determine our ip and fall-back
-                to a default value.
-                """
-                sock.connect(("10.254.254.254", 1))
-                myip = sock.getsockname()[0]
-            except Exception:
-                myip = "127.0.0.1"
-
-        self._myip = myip
+        self._myip: getmyip()
 
     def getmyip(self):
         """Return my ip address"""
