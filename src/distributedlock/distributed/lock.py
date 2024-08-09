@@ -20,10 +20,11 @@ from .logger import getLogger
 log = getLogger("distributed_lock")
 
 __all__ = ['DistributedLock', 'statedesc',
-           'InvalidPeerArgumentError', 'InvalidHostURIError']
+           'InvalidPeerArgumentError', 'InvalidHostURIError', 'getmyip']
 
-statedesc = ["follower", "leader"]
+statedesc = ['follower', 'leader']
 STARTPORT = 8100
+
 
 def getmyip() -> str:
     """
@@ -43,18 +44,22 @@ def getmyip() -> str:
     log.debug("getmyip() my ip is {myip}")
     return myip
 
+
 class InvalidPeerArgumentError(Exception):
     """ Wrong number of peers error
     """
+
 
 class InvalidHostURIError(Exception):
     """ Host URI not provided error
     """
 
+
 def genlockid() -> str:
     """ Generate a unique lockid
     """
     return str(uuid.uuid1().hex)
+
 
 class DistributedLock:
     """
@@ -83,8 +88,6 @@ class DistributedLock:
             raise InvalidPeerArgumentError
 
         log.debug("DistributedLock.__init__(): myip {self.myip} peers {self.peers}")
-
-
 
     def run(self):
         """
@@ -123,7 +126,6 @@ class DistributedLock:
 
         self.setleaderstate(False)
         self.lockmanager.release(self.lockid, sync=True)
-
 
     def setleaderstate(self, state: int) -> None:
         """
